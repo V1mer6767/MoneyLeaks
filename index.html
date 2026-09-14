@@ -68,6 +68,28 @@ header {
   display: flex; align-items: center; justify-content: center;
   color: var(--dim); font-size: 15px; cursor: pointer; flex-shrink: 0;
 }
+.icon-btn.spinning { animation: ml-spin .5s linear; color: var(--accent); }
+@keyframes ml-spin { to { transform: rotate(360deg); } }
+
+.import-box {
+  width: 100%; min-height: 130px; padding: 14px; margin-bottom: 14px;
+  background: var(--surface2); border: 1px solid var(--line); border-radius: 14px;
+  color: var(--text); font-size: 13px; font-family: 'SF Mono', monospace; outline: none;
+  resize: vertical;
+}
+.import-box::placeholder { color: var(--dim2); font-family: var(--font); }
+.import-help {
+  background: var(--surface2); border: 1px solid var(--line); border-radius: 14px;
+  padding: 14px; margin-bottom: 16px; font-size: 12px; color: var(--dim); line-height: 1.7;
+}
+.import-help b { color: var(--text); }
+.import-preview {
+  background: var(--surface2); border: 1px solid var(--line); border-radius: 14px;
+  padding: 12px 14px; margin-bottom: 14px; font-size: 12px; color: var(--dim); display: none;
+}
+.import-preview.show { display: block; }
+.import-preview .imp-row { display: flex; justify-content: space-between; padding: 4px 0; }
+.import-preview .imp-row b { color: var(--text); }
 
 /* ---------- card ---------- */
 .card {
@@ -364,7 +386,10 @@ nav button.active .nav-icon { opacity: 1; }
 <div class="view active" id="view-overview">
   <header>
     <button class="month-select" onclick="cycleMonth()"><span id="month-label">—</span><span class="chev">▾</span></button>
-    <button class="icon-btn">📅</button>
+    <div style="display:flex; gap:8px;">
+      <button class="icon-btn" onclick="openImportSheet()" title="Імпорт зі скріншота">📥</button>
+      <button class="icon-btn" id="btn-refresh" onclick="refreshApp()" title="Оновити">↻</button>
+    </div>
   </header>
 
   <div class="card overview-card">
@@ -544,6 +569,25 @@ nav button.active .nav-icon { opacity: 1; }
     <span class="cur">₴</span>
   </div>
   <button class="btn-primary" onclick="saveSavingsDeposit()">Додати</button>
+</div>
+
+<!-- Import sheet -->
+<div class="sheet-backdrop" id="import-backdrop" onclick="closeImportSheet()"></div>
+<div class="sheet" id="import-sheet">
+  <div class="sheet-handle"></div>
+  <button class="sheet-close" onclick="closeImportSheet()">✕</button>
+  <div class="sheet-title">📥 Імпорт витрат</div>
+  <div class="sheet-sub">Встав код, який тобі підготували зі скріншота</div>
+
+  <div class="import-help">
+    Скинь скріншот чека, банківського переказу чи виписки прямо в чат — звідти прочитають суму, категорію й дату та нададуть короткий код. Встав його сюди й тапни «Додати».
+  </div>
+
+  <textarea class="import-box" id="import-text" oninput="updateImportPreview()" placeholder='[{"amount":85,"cat":"coffee","type":"waste","note":"Кава"}]'></textarea>
+
+  <div class="import-preview" id="import-preview"></div>
+
+  <button class="btn-primary" onclick="importExpenses()">Додати</button>
 </div>
 
 <script>
@@ -1037,6 +1081,82 @@ window.addEventListener('resize', () => {
   const activeView = document.querySelector('.view.active').id.replace('view-','');
   if (activeView==='goal') renderGoalView();
 });
+
+/* ---------- import from screenshot (pasted JSON) ---------- */
+function resolveCategoryKey(input) {
+  if (!input) return 'other';
+  const key = String(input).trim().toLowerCase();
+  if (CATEGORIES[key]) return key;
+  for (const [k, c] of Object.entries(CATEGORIES)) {
+    if (c.name.toLowerCase() === key) return k;
+  }
+  for (const [k, c] of Object.entries(CATEGORIES)) {
+    const n = c.name.toLowerCase();
+    if (key.includes(n) || n.includes(key)) return k;
+  }
+  return 'other';
+}
+function parseImportText(raw) {
+  let data;
+  try { data = JSON.parse(raw); } catch(e) { return null; }
+  if (!Array.isArray(data)) data = [data];
+  const out = data.map(item => {
+    const amount = parseFloat(item.amount);
+    if (!amount || amount <= 0) return null;
+    const cat = resolveCategoryKey(item.cat || item.category);
+    const type = (item.type === 'necessary' || item.type === 'необхідне') ? 'necessary' : 'waste';
+    const note = item.note || '';
+    let ts = Date.now();
+    if (item.date) {
+      const d = new Date(item.date);
+      if (!isNaN(d)) ts = d.getTime();
+    }
+    return { id: 'e'+Date.now()+Math.random().toString(36).slice(2,7)+Math.random().toString(36).slice(2,5), amount, cat, type, note, ts };
+  }).filter(Boolean);
+  return out;
+}
+function updateImportPreview() {
+  const raw = document.getElementById('import-text').value.trim();
+  const preview = document.getElementById('import-preview');
+  if (!raw) { preview.classList.remove('show'); return; }
+  const parsed = parseImportText(raw);
+  preview.classList.add('show');
+  if (!parsed || !parsed.length) {
+    preview.innerHTML = '<div style="color:var(--waste);">Не вдалось розпізнати жодної витрати — перевір формат</div>';
+    return;
+  }
+  preview.innerHTML = parsed.map(e =>
+    `<div class="imp-row"><span>${CATEGORIES[e.cat].icon} ${e.note || CATEGORIES[e.cat].name}</span><b>${formatMoney(e.amount)}</b></div>`
+  ).join('');
+}
+function openImportSheet() {
+  document.getElementById('import-text').value = '';
+  document.getElementById('import-preview').classList.remove('show');
+  document.getElementById('import-backdrop').classList.add('open');
+  document.getElementById('import-sheet').classList.add('open');
+}
+function closeImportSheet() {
+  document.getElementById('import-backdrop').classList.remove('open');
+  document.getElementById('import-sheet').classList.remove('open');
+}
+function importExpenses() {
+  const raw = document.getElementById('import-text').value.trim();
+  if (!raw) { alert('Встав код зі скріншота!'); return; }
+  const parsed = parseImportText(raw);
+  if (!parsed || !parsed.length) { alert('Не вдалось розпізнати жодної витрати. Перевір формат коду.'); return; }
+  state.expenses.push(...parsed);
+  save();
+  closeImportSheet();
+  refreshAll();
+  alert(`Додано ${parsed.length} ${purchaseWord(parsed.length)}!`);
+}
+
+/* ---------- refresh ---------- */
+function refreshApp() {
+  const btn = document.getElementById('btn-refresh');
+  btn.classList.add('spinning');
+  setTimeout(() => location.reload(), 400);
+}
 
 refreshAll();
 
