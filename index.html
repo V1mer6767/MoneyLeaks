@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no"/>
+<title>MoneyLeaks — Контроль витрат</title>
+<link rel="manifest" href="manifest.json"/>
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png"/>
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png"/>
+<link rel="apple-touch-icon" href="icons/icon-180.png"/>
+<meta name="theme-color" content="#ff8c42"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="MoneyLeaks"/>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+:root {
+  --bg: #0d0d10;
+  --surface: #18181c;
+  --surface2: #1f2024;
+  --surface3: #26272c;
+  --line: rgba(255,255,255,0.07);
+  --text: #f5f5f7;
+  --dim: #8b8d96;
+  --dim2: #5c5e68;
+  --accent: #ff8c42;
+  --accent-dim: rgba(255,140,66,0.14);
+  --waste: #ef5a52;
+  --waste-dim: rgba(239,90,82,0.14);
+  --good: #4fd98a;
+  --font: 'Inter', -apple-system, ui-sans-serif, sans-serif;
+}
+
+html, body { height: 100%; overscroll-behavior: none; }
+body {
+  background: var(--bg);
+  font-family: var(--font);
+  color: var(--text);
+  padding-bottom: 88px;
+  min-height: 100vh;
+  -webkit-user-select: none; user-select: none;
+}
+input, textarea { -webkit-user-select: text; user-select: text; }
+
+.view { display: none; padding: 0 18px 20px; }
+.view.active { display: block; }
+
+/* ---------- header ---------- */
+header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 18px 14px;
+}
+.month-select {
+  display: flex; align-items: center; gap: 6px;
+  background: none; border: none; color: var(--text);
+  font-size: 26px; font-weight: 700; letter-spacing: -.3px;
+  cursor: pointer; font-family: var(--font);
+}
+.month-select .chev { color: var(--dim); font-size: 15px; margin-top: 3px; }
+.page-title { font-size: 24px; font-weight: 700; letter-spacing: -.3px; }
+.page-sub { font-size: 13px; color: var(--dim); margin-top: 3px; }
+.icon-btn {
+  width: 38px; height: 38px; border-radius: 50%;
+  background: var(--surface2); border: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--dim); font-size: 15px; cursor: pointer; flex-shrink: 0;
+}
+
+/* ---------- card ---------- */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 18px;
+  margin-bottom: 12px;
+}
+
+/* ---------- overview donut card ---------- */
+.overview-card { display: flex; align-items: center; gap: 18px; }
+.donut-wrap { position: relative; width: 96px; height: 96px; flex-shrink: 0; }
+.donut-wrap canvas { width: 96px; height: 96px; }
+.donut-center {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+}
+.donut-pct { font-size: 19px; font-weight: 800; letter-spacing: -.3px; }
+.donut-lbl { font-size: 9px; color: var(--dim); font-weight: 600; text-align: center; line-height: 1.3; margin-top: 1px; }
+.overview-stats { flex: 1; min-width: 0; }
+.stat-line { font-size: 12px; color: var(--dim); margin-bottom: 2px; }
+.stat-big { font-size: 24px; font-weight: 800; letter-spacing: -.4px; margin-bottom: 10px; }
+.stat-line2 { font-size: 12px; color: var(--dim); margin-bottom: 2px; }
+.stat-waste { font-size: 19px; font-weight: 800; color: var(--waste); }
+
+/* ---------- insight chips ---------- */
+.insight-row { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 2px; margin-bottom: 14px; scrollbar-width: none; }
+.insight-row::-webkit-scrollbar { display: none; }
+.insight-chip {
+  flex: 1; min-width: 150px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 16px;
+  padding: 14px;
+}
+.insight-chip .ic-top { font-size: 12px; color: var(--dim); margin-bottom: 6px; }
+.insight-chip .ic-val { font-size: 16px; font-weight: 800; color: var(--waste); margin-bottom: 3px; }
+.insight-chip .ic-sub { font-size: 11px; color: var(--dim2); }
+.insight-chip.empty .ic-val { color: var(--good); font-size: 14px; }
+
+/* ---------- section headers ---------- */
+.section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.section-title { font-size: 14px; font-weight: 700; }
+.section-link { font-size: 12px; color: var(--dim); font-weight: 600; cursor: pointer; }
+
+/* ---------- expense rows ---------- */
+.exp-row { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
+.exp-row:last-child { border-bottom: none; }
+.exp-avatar {
+  width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 18px;
+}
+.exp-info { flex: 1; min-width: 0; }
+.exp-name { font-size: 14px; font-weight: 600; }
+.exp-date { font-size: 11px; color: var(--dim); margin-top: 2px; }
+.exp-right { text-align: right; flex-shrink: 0; }
+.exp-tag { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 6px; display: inline-block; margin-bottom: 4px; }
+.exp-tag.waste { background: var(--waste-dim); color: var(--waste); }
+.exp-tag.necessary { background: rgba(79,217,138,0.14); color: var(--good); }
+.exp-amt { font-size: 14px; font-weight: 700; }
+
+.day-group { margin-bottom: 4px; }
+.day-head { font-size: 12px; font-weight: 700; color: var(--dim); margin: 16px 0 8px; }
+.day-head:first-child { margin-top: 0; }
+
+/* ---------- add button ---------- */
+.btn-add {
+  width: 100%; padding: 16px; margin-top: 4px;
+  background: var(--accent); border: none; border-radius: 16px;
+  color: #1a0d04; font-size: 15px; font-weight: 800; font-family: var(--font);
+  cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.btn-primary {
+  width: 100%; padding: 16px;
+  background: var(--accent); border: none; border-radius: 16px;
+  color: #1a0d04; font-size: 15px; font-weight: 800; font-family: var(--font);
+  cursor: pointer;
+}
+.btn-ghost {
+  width: 100%; padding: 14px; margin-top: 8px;
+  background: none; border: 1px solid var(--line); border-radius: 16px;
+  color: var(--dim); font-size: 13px; font-weight: 700; font-family: var(--font); cursor: pointer;
+}
+
+.empty-state { text-align: center; padding: 60px 20px 30px; color: var(--dim); }
+.empty-state .es-icon { font-size: 40px; display: block; margin-bottom: 12px; }
+.empty-state strong { color: var(--text); display: block; margin-top: 4px; font-size: 14px; }
+
+/* ---------- bottom sheet ---------- */
+.sheet-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 40;
+  opacity: 0; pointer-events: none; transition: opacity .2s;
+}
+.sheet-backdrop.open { opacity: 1; pointer-events: auto; }
+.sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 41;
+  background: var(--surface); border-radius: 24px 24px 0 0;
+  padding: 10px 18px calc(20px + env(safe-area-inset-bottom));
+  max-height: 86vh; overflow-y: auto;
+  transform: translateY(100%); transition: transform .28s cubic-bezier(.32,.72,0,1);
+}
+.sheet.open { transform: translateY(0); }
+.sheet-handle { width: 36px; height: 4px; background: var(--line); border-radius: 3px; margin: 6px auto 16px; }
+.sheet-close {
+  position: absolute; right: 16px; top: 16px;
+  background: var(--surface2); border: none; color: var(--dim);
+  width: 32px; height: 32px; border-radius: 50%; font-size: 14px; cursor: pointer;
+}
+.sheet-title { font-size: 20px; font-weight: 800; letter-spacing: -.3px; }
+.sheet-sub { font-size: 12px; color: var(--dim); margin-top: 3px; margin-bottom: 20px; }
+
+/* ---------- amount input ---------- */
+.amount-input-wrap {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  background: var(--surface2); border: 1px solid var(--line); border-radius: 16px;
+  padding: 18px; margin-bottom: 22px;
+}
+.amount-input-wrap input {
+  border: none; background: none; outline: none; color: var(--text);
+  font-family: var(--font); font-size: 34px; font-weight: 800; letter-spacing: -.5px;
+  text-align: right; width: 100%; max-width: 160px;
+}
+.amount-input-wrap .cur { font-size: 22px; color: var(--dim); font-weight: 700; }
+
+.field-label { font-size: 12px; font-weight: 700; color: var(--dim); margin-bottom: 10px; text-transform: none; }
+
+.cat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
+.cat-pick {
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+  background: var(--surface2); border: 2px solid transparent; border-radius: 14px;
+  padding: 12px 6px; cursor: pointer;
+}
+.cat-pick .cp-icon {
+  width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; font-size: 16px;
+}
+.cat-pick .cp-name { font-size: 11px; font-weight: 600; color: var(--dim); }
+.cat-pick.active { border-color: var(--accent); background: var(--accent-dim); }
+.cat-pick.active .cp-name { color: var(--text); }
+
+.type-toggle { display: flex; gap: 10px; margin-bottom: 20px; }
+.type-btn {
+  flex: 1; padding: 13px; text-align: center;
+  background: var(--surface2); border: 1px solid var(--line); border-radius: 14px;
+  font-size: 13px; font-weight: 700; color: var(--dim); cursor: pointer;
+}
+.type-btn.active-necessary { background: rgba(79,217,138,0.16); border-color: var(--good); color: var(--good); }
+.type-btn.active-waste { background: var(--waste-dim); border-color: var(--waste); color: var(--waste); }
+
+.note-input {
+  width: 100%; padding: 14px; margin-bottom: 22px;
+  background: var(--surface2); border: 1px solid var(--line); border-radius: 14px;
+  color: var(--text); font-size: 14px; font-family: var(--font); outline: none;
+}
+.note-input::placeholder { color: var(--dim2); }
+
+/* ---------- categories view ---------- */
+.cat-total-card { display: flex; align-items: center; gap: 14px; }
+.cat-total-icon {
+  width: 48px; height: 48px; border-radius: 50%; flex-shrink: 0;
+  background: var(--waste-dim); display: flex; align-items: center; justify-content: center; font-size: 22px;
+}
+.cat-total-info { flex: 1; }
+.cat-total-lbl { font-size: 12px; color: var(--dim); margin-bottom: 3px; }
+.cat-total-val { font-size: 22px; font-weight: 800; color: var(--waste); margin-bottom: 5px; }
+.cat-total-sub { font-size: 11px; color: var(--dim2); line-height: 1.5; }
+
+.unit-toggle { display: flex; background: var(--surface2); border-radius: 8px; padding: 2px; }
+.unit-toggle button {
+  border: none; background: none; color: var(--dim); font-size: 11px; font-weight: 700;
+  padding: 5px 10px; border-radius: 6px; cursor: pointer; font-family: var(--font);
+}
+.unit-toggle button.active { background: var(--surface3); color: var(--text); }
+
+.bar-row { margin-bottom: 12px; }
+.bar-row:last-child { margin-bottom: 0; }
+.bar-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.bar-icon { font-size: 13px; }
+.bar-name { font-size: 12px; font-weight: 600; flex: 1; }
+.bar-val { font-size: 12px; font-weight: 700; color: var(--dim); }
+.bar-track { height: 8px; background: var(--surface2); border-radius: 5px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 5px; }
+
+.cat-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
+.cat-row:last-child { border-bottom: none; }
+.cat-row-avatar { width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+.cat-row-info { flex: 1; min-width: 0; }
+.cat-row-name { font-size: 14px; font-weight: 700; }
+.cat-row-sub { font-size: 11px; color: var(--dim); margin-top: 2px; }
+.cat-row-right { text-align: right; flex-shrink: 0; }
+.cat-row-amt { font-size: 14px; font-weight: 800; }
+.cat-row-pct { font-size: 10px; color: var(--waste); margin-top: 2px; font-weight: 700; }
+.sort-select { font-size: 12px; color: var(--dim); font-weight: 600; cursor: pointer; }
+
+/* ---------- goal view ---------- */
+.goal-donut-wrap { position: relative; width: 176px; height: 176px; margin: 8px auto 4px; }
+.goal-donut-wrap canvas { width: 176px; height: 176px; }
+.goal-donut-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.goal-saved { font-size: 26px; font-weight: 800; letter-spacing: -.4px; }
+.goal-target { font-size: 12px; color: var(--dim); margin-top: 3px; }
+.goal-pct { font-size: 15px; font-weight: 800; color: var(--accent); margin-top: 6px; }
+
+.chart-wrap { margin: 6px 0 2px; }
+.chart-yaxis { display: flex; justify-content: space-between; font-size: 9px; color: var(--dim2); margin-bottom: 4px; }
+.chart-xaxis { display: flex; justify-content: space-between; margin-top: 4px; }
+.chart-xaxis span { font-size: 9px; color: var(--dim2); }
+
+.insight-card { display: flex; align-items: center; gap: 12px; cursor: pointer; }
+.insight-card .ins-icon {
+  width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
+  background: var(--accent-dim); display: flex; align-items: center; justify-content: center; font-size: 18px;
+}
+.insight-card .ins-info { flex: 1; min-width: 0; }
+.insight-card .ins-title { font-size: 13px; font-weight: 700; }
+.insight-card .ins-sub { font-size: 12px; color: var(--dim); margin-top: 2px; }
+.insight-card .ins-chev { color: var(--dim2); font-size: 15px; }
+
+/* ---------- goal edit sheet ---------- */
+.goal-input {
+  width: 100%; padding: 14px; margin-bottom: 16px;
+  background: var(--surface2); border: 1px solid var(--line); border-radius: 14px;
+  color: var(--text); font-size: 14px; font-family: var(--font); outline: none;
+}
+
+/* ---------- nav ---------- */
+nav {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+  display: flex; background: var(--surface);
+  border-top: 1px solid var(--line);
+  padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+}
+nav button {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  background: none; border: none; color: var(--dim2);
+  font-size: 10px; font-weight: 600; font-family: var(--font);
+  padding: 7px 0; cursor: pointer;
+}
+nav button .nav-icon { font-size: 20px; opacity: .55; }
+nav button.active { color: var(--accent); }
+nav button.active .nav-icon { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="view active" id="view-overview">
+  <header>
+    <button class="month-select" onclick="cycleMonth()"><span id="month-label">—</span><span class="chev">▾</span></button>
+    <button class="icon-btn">📅</button>
+  </header>
+
+  <div class="card overview-card">
+    <div class="donut-wrap">
+      <canvas id="overview-donut" width="192" height="192"></canvas>
+      <div class="donut-center">
+        <div class="donut-pct" id="ov-pct">0%</div>
+        <div class="donut-lbl">зайві<br>витрати</div>
+      </div>
+    </div>
+    <div class="overview-stats">
+      <div class="stat-line">Витрачено:</div>
+      <div class="stat-big" id="ov-total">0 ₴</div>
+      <div class="stat-line2">з них зайвих:</div>
+      <div class="stat-waste" id="ov-waste">0 ₴</div>
+    </div>
+  </div>
+
+  <div class="insight-row" id="insight-row"></div>
+
+  <div class="section-head">
+    <div class="section-title">Останні зайві витрати</div>
+    <div class="section-link" onclick="showView('expenses',document.querySelectorAll('nav button')[1])">Показати всі ›</div>
+  </div>
+  <div class="card" id="recent-waste-card">
+    <div id="recent-waste-list"></div>
+  </div>
+
+  <button class="btn-add" onclick="openAddSheet()">+ Додати витрату</button>
+</div>
+
+<div class="view" id="view-expenses">
+  <header>
+    <div>
+      <div class="page-title">Витрати</div>
+      <div class="page-sub" id="exp-page-sub">—</div>
+    </div>
+  </header>
+  <div id="expenses-list"></div>
+</div>
+
+<div class="view" id="view-categories">
+  <header><div class="page-title">Категорії</div></header>
+
+  <div class="card cat-total-card">
+    <div class="cat-total-icon">🪙</div>
+    <div class="cat-total-info">
+      <div class="cat-total-lbl">Всього зайвого цього місяця</div>
+      <div class="cat-total-val" id="cat-total-val">0 ₴</div>
+      <div class="cat-total-sub">Ці кошти можна було б заощадити і наблизити себе до цілі</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="section-head">
+      <div class="section-title">Зайві витрати за категоріями</div>
+      <div class="unit-toggle">
+        <button class="active" id="unit-cur" onclick="setBarUnit('cur')">₴</button>
+        <button id="unit-pct" onclick="setBarUnit('pct')">%</button>
+      </div>
+    </div>
+    <div id="cat-bars"></div>
+  </div>
+
+  <div class="section-head">
+    <div class="section-title">Категорії</div>
+    <div class="sort-select" onclick="cycleSortMode()">За розміром зайвого ▾</div>
+  </div>
+  <div class="card" id="cat-list-card">
+    <div id="cat-list"></div>
+  </div>
+</div>
+
+<div class="view" id="view-goal">
+  <header>
+    <div>
+      <div class="page-title" id="goal-title">Ціль</div>
+      <div class="page-sub">Зібрано за рахунок економії</div>
+    </div>
+  </header>
+
+  <div class="card" style="text-align:center;">
+    <div class="goal-donut-wrap">
+      <canvas id="goal-donut" width="352" height="352"></canvas>
+      <div class="goal-donut-center">
+        <div class="goal-saved" id="goal-saved-val">0 ₴</div>
+        <div class="goal-target" id="goal-target-val">з 0 ₴</div>
+        <div class="goal-pct" id="goal-pct-val">0%</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="section-title" style="margin-bottom:10px;">Економія за останні 6 тижнів</div>
+    <div class="chart-yaxis" id="goal-chart-yaxis"></div>
+    <div class="chart-wrap"><canvas id="goal-chart" height="100"></canvas></div>
+    <div class="chart-xaxis" id="goal-chart-xaxis"></div>
+  </div>
+
+  <div class="card insight-card" id="goal-progress-card" onclick="openAddSavingsSheet()">
+    <div class="ins-icon">🏆</div>
+    <div class="ins-info">
+      <div class="ins-title" id="goal-progress-title">0% досягнуто</div>
+      <div class="ins-sub">Тапни, щоб додати заощадження ›</div>
+    </div>
+  </div>
+
+  <div class="card insight-card">
+    <div class="ins-icon">📅</div>
+    <div class="ins-info">
+      <div class="ins-title" id="goal-eta-title">—</div>
+      <div class="ins-sub" id="goal-eta-sub">—</div>
+    </div>
+  </div>
+
+  <button class="btn-primary" onclick="openEditGoalSheet()" style="margin-top:4px;">Змінити ціль</button>
+</div>
+
+<nav>
+  <button class="active" onclick="showView('overview',this)"><span class="nav-icon">🏠</span>Огляд</button>
+  <button onclick="showView('expenses',this)"><span class="nav-icon">📋</span>Витрати</button>
+  <button onclick="showView('categories',this)"><span class="nav-icon">📊</span>Категорії</button>
+  <button onclick="showView('goal',this)"><span class="nav-icon">🎯</span>Ціль</button>
+</nav>
+
+<!-- Add expense sheet -->
+<div class="sheet-backdrop" id="add-backdrop" onclick="closeAddSheet()"></div>
+<div class="sheet" id="add-sheet">
+  <div class="sheet-handle"></div>
+  <button class="sheet-close" onclick="closeAddSheet()">✕</button>
+  <div class="sheet-title">Нова витрата</div>
+  <div class="sheet-sub">Додай зараз — ближче до своїх цілей</div>
+
+  <div class="amount-input-wrap">
+    <input type="number" id="inp-amount" inputmode="decimal" placeholder="0"/>
+    <span class="cur">₴</span>
+  </div>
+
+  <div class="field-label">Категорія</div>
+  <div class="cat-grid" id="cat-grid"></div>
+
+  <div class="field-label">Тип витрати</div>
+  <div class="type-toggle">
+    <div class="type-btn" id="type-necessary" onclick="setExpType('necessary')">Необхідне</div>
+    <div class="type-btn" id="type-waste" onclick="setExpType('waste')">Зайве</div>
+  </div>
+
+  <div class="field-label">Нотатка</div>
+  <input type="text" class="note-input" id="inp-note" placeholder="Напр. Starbucks, кут вулиці"/>
+
+  <button class="btn-primary" onclick="saveExpense()">Зберегти</button>
+</div>
+
+<!-- Edit goal sheet -->
+<div class="sheet-backdrop" id="goal-backdrop" onclick="closeGoalSheet()"></div>
+<div class="sheet" id="goal-sheet">
+  <div class="sheet-handle"></div>
+  <button class="sheet-close" onclick="closeGoalSheet()">✕</button>
+  <div class="sheet-title">Змінити ціль</div>
+  <div class="sheet-sub">Онови назву та суму цілі</div>
+  <div class="field-label">Назва цілі</div>
+  <input type="text" class="goal-input" id="inp-goal-name" placeholder="Напр. Відпустка в Карпатах"/>
+  <div class="field-label">Сума цілі, ₴</div>
+  <input type="number" class="goal-input" id="inp-goal-target" inputmode="decimal" placeholder="15000"/>
+  <button class="btn-primary" onclick="saveGoalEdit()">Зберегти</button>
+</div>
+
+<!-- Add savings sheet -->
+<div class="sheet-backdrop" id="savings-backdrop" onclick="closeSavingsSheet()"></div>
+<div class="sheet" id="savings-sheet">
+  <div class="sheet-handle"></div>
+  <button class="sheet-close" onclick="closeSavingsSheet()">✕</button>
+  <div class="sheet-title">Додати заощадження</div>
+  <div class="sheet-sub">Заощадив на зайвому — зроби внесок у ціль</div>
+  <div class="amount-input-wrap">
+    <input type="number" id="inp-savings-amount" inputmode="decimal" placeholder="0"/>
+    <span class="cur">₴</span>
+  </div>
+  <button class="btn-primary" onclick="saveSavingsDeposit()">Додати</button>
+</div>
+
+<script>
+const STORAGE_KEY = 'moneyleaks_v1';
+const CATEGORIES = {
+  coffee: { name: "Кава",      icon: "☕", color: "#ff8c42" },
+  taxi:   { name: "Таксі",     icon: "🚗", color: "#4a9eff" },
+  food:   { name: "Їжа",       icon: "🍽️", color: "#4fd98a" },
+  subs:   { name: "Підписки",  icon: "💳", color: "#ff4d6d" },
+  fun:    { name: "Розваги",   icon: "🎮", color: "#a855f7" },
+  shop:   { name: "Покупки",   icon: "🛍️", color: "#ffc247" },
+  other:  { name: "Інше",      icon: "⋯",  color: "#8b8d96" },
+};
+const MONTH_NAMES = ["Січень","Лютий","Березень","Квітень","Травень","Червень","Липень","Серпень","Вересень","Жовтень","Листопад","Грудень"];
+
+function loadState() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (raw) { try { return JSON.parse(raw); } catch(e) {} }
+  return {
+    expenses: [],
+    goal: { name: "Відпустка в Карпатах", target: 15000, saved: 0, log: [] },
+    monthOffset: 0,
+  };
+}
+let state = loadState();
+function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
+let pendingCategory = 'coffee';
+let pendingType = 'waste';
+let barUnit = 'cur';
+let sortMode = 'waste'; // 'waste' | 'amount' | 'name'
+
+/* ---------- month helpers ---------- */
+function activeMonthDate() {
+  const d = new Date();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + state.monthOffset);
+  return d;
+}
+function monthLabel() {
+  const d = activeMonthDate();
+  return MONTH_NAMES[d.getMonth()];
+}
+function cycleMonth() {
+  state.monthOffset = state.monthOffset >= 0 ? -1 : 0;
+  save();
+  refreshAll();
+}
+function expensesInActiveMonth() {
+  const d = activeMonthDate();
+  const y = d.getFullYear(), m = d.getMonth();
+  return state.expenses.filter(e => {
+    const ed = new Date(e.ts);
+    return ed.getFullYear() === y && ed.getMonth() === m;
+  });
+}
+function formatMoney(n) {
+  return Math.round(n).toLocaleString('uk-UA') + ' ₴';
+}
+function startOfWeek(d) {
+  const nd = new Date(d);
+  const day = (nd.getDay() + 6) % 7; // Monday=0
+  nd.setDate(nd.getDate() - day);
+  nd.setHours(0,0,0,0);
+  return nd;
+}
+
+/* ---------- donut drawing ---------- */
+function drawDonut(canvasId, pct, color, trackColor, lineWidth) {
+  const canvas = document.getElementById(canvasId);
+  const ctx = canvas.getContext('2d');
+  const size = canvas.width;
+  const cx = size/2, cy = size/2, r = size/2 - lineWidth;
+  ctx.clearRect(0,0,size,size);
+  ctx.lineCap = 'round';
+  ctx.lineWidth = lineWidth;
+  ctx.strokeStyle = trackColor;
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke();
+  if (pct > 0) {
+    ctx.strokeStyle = color;
+    ctx.beginPath();
+    ctx.arc(cx,cy,r,-Math.PI/2, -Math.PI/2 + Math.PI*2*Math.min(pct,1));
+    ctx.stroke();
+  }
+}
+
+/* ---------- overview ---------- */
+function renderOverview() {
+  document.getElementById('month-label').textContent = monthLabel();
+  const monthExp = expensesInActiveMonth();
+  const total = monthExp.reduce((s,e)=>s+e.amount,0);
+  const waste = monthExp.filter(e=>e.type==='waste').reduce((s,e)=>s+e.amount,0);
+  const pct = total>0 ? waste/total : 0;
+
+  document.getElementById('ov-total').textContent = formatMoney(total);
+  document.getElementById('ov-waste').textContent = formatMoney(waste);
+  document.getElementById('ov-pct').textContent = Math.round(pct*100)+'%';
+  drawDonut('overview-donut', pct, '#ff8c42', '#26272c', 12);
+
+  // insight chips
+  const weekStart = startOfWeek(new Date());
+  const weekExp = state.expenses.filter(e => new Date(e.ts) >= weekStart && e.type==='waste');
+  const byCat = {};
+  weekExp.forEach(e => { byCat[e.cat] = (byCat[e.cat]||0) + e.amount; });
+  const catEntries = Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
+
+  const row = document.getElementById('insight-row');
+  row.innerHTML = '';
+  if (catEntries.length >= 1) {
+    const [cat, amt] = catEntries[0];
+    row.innerHTML += `<div class="insight-chip">
+      <div class="ic-top">${CATEGORIES[cat].icon} ${CATEGORIES[cat].name}</div>
+      <div class="ic-val">+${formatMoney(amt)}</div>
+      <div class="ic-sub">цього тижня</div>
+    </div>`;
+  }
+  if (catEntries.length >= 2) {
+    const [cat, amt] = catEntries[1];
+    row.innerHTML += `<div class="insight-chip">
+      <div class="ic-top">${CATEGORIES[cat].icon} ${CATEGORIES[cat].name}</div>
+      <div class="ic-val">+${formatMoney(amt)}</div>
+      <div class="ic-sub">цього тижня</div>
+    </div>`;
+  } else if (catEntries.length === 1) {
+    row.innerHTML += `<div class="insight-chip">
+      <div class="ic-top">Зайвих витрат</div>
+      <div class="ic-val">${weekExp.length}</div>
+      <div class="ic-sub">цього тижня</div>
+    </div>`;
+  }
+  if (!catEntries.length) {
+    row.innerHTML = `<div class="insight-chip empty">
+      <div class="ic-top">Цього тижня</div>
+      <div class="ic-val">Жодної зайвої витрати 🎉</div>
+    </div>`;
+  }
+
+  // recent waste list
+  const recentWaste = state.expenses.filter(e=>e.type==='waste').sort((a,b)=>b.ts-a.ts).slice(0,3);
+  const listEl = document.getElementById('recent-waste-list');
+  const cardEl = document.getElementById('recent-waste-card');
+  if (!recentWaste.length) {
+    cardEl.innerHTML = `<div class="empty-state" style="padding:24px 10px;">
+      <span class="es-icon">✨</span>Ще немає зайвих витрат
+    </div>`;
+  } else {
+    cardEl.innerHTML = '<div id="recent-waste-list"></div>';
+    document.getElementById('recent-waste-list').innerHTML = recentWaste.map(e => expenseRowHtml(e)).join('');
+  }
+}
+
+function relativeDay(ts) {
+  const d = new Date(ts);
+  const now = new Date();
+  const dayDiff = Math.floor((new Date(now.toDateString()) - new Date(d.toDateString())) / 86400000);
+  const time = d.toLocaleTimeString('uk-UA', {hour:'2-digit', minute:'2-digit'});
+  if (dayDiff === 0) return `Сьогодні, ${time}`;
+  if (dayDiff === 1) return `Вчора, ${time}`;
+  return d.toLocaleDateString('uk-UA', {day:'numeric', month:'short'}) + `, ${time}`;
+}
+
+function expenseRowHtml(e) {
+  const cat = CATEGORIES[e.cat];
+  return `<div class="exp-row" onclick="openExpenseDetail('${e.id}')">
+    <div class="exp-avatar" style="background:${cat.color}26;color:${cat.color};">${cat.icon}</div>
+    <div class="exp-info">
+      <div class="exp-name">${e.note ? e.note : cat.name}</div>
+      <div class="exp-date">${relativeDay(e.ts)}</div>
+    </div>
+    <div class="exp-right">
+      <div class="exp-tag ${e.type==='waste'?'waste':'necessary'}">${e.type==='waste'?'Зайве':'Потрібне'}</div>
+      <div class="exp-amt">${formatMoney(e.amount)}</div>
+    </div>
+  </div>`;
+}
+
+function openExpenseDetail(id) {
+  const e = state.expenses.find(x=>x.id===id);
+  if (!e) return;
+  if (confirm(`${CATEGORIES[e.cat].name} · ${formatMoney(e.amount)}${e.note ? '\\n'+e.note : ''}\\n\\nВидалити цю витрату?`)) {
+    state.expenses = state.expenses.filter(x=>x.id!==id);
+    save();
+    refreshAll();
+  }
+}
+
+/* ---------- expenses list view ---------- */
+function renderExpensesView() {
+  document.getElementById('exp-page-sub').textContent = monthLabel();
+  const monthExp = expensesInActiveMonth().sort((a,b)=>b.ts-a.ts);
+  const container = document.getElementById('expenses-list');
+  if (!monthExp.length) {
+    container.innerHTML = `<div class="empty-state"><span class="es-icon">📋</span>Ще немає витрат за цей місяць<strong>Додай першу витрату!</strong></div>`;
+    return;
+  }
+  const groups = {};
+  monthExp.forEach(e => {
+    const key = new Date(e.ts).toDateString();
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(e);
+  });
+  let html = '';
+  Object.entries(groups).forEach(([key, list]) => {
+    const d = new Date(key);
+    const dayTotal = list.reduce((s,e)=>s+e.amount,0);
+    html += `<div class="day-group">
+      <div class="day-head">${d.toLocaleDateString('uk-UA',{weekday:'long',day:'numeric',month:'long'})} · ${formatMoney(dayTotal)}</div>
+      <div class="card" style="padding:6px 16px;">${list.map(e=>expenseRowHtml(e)).join('')}</div>
+    </div>`;
+  });
+  container.innerHTML = html;
+}
+
+/* ---------- categories view ---------- */
+function setBarUnit(u) {
+  barUnit = u;
+  document.getElementById('unit-cur').classList.toggle('active', u==='cur');
+  document.getElementById('unit-pct').classList.toggle('active', u==='pct');
+  renderCategoriesView();
+}
+function cycleSortMode() {
+  sortMode = sortMode==='waste' ? 'amount' : sortMode==='amount' ? 'name' : 'waste';
+  document.querySelector('.sort-select').textContent =
+    (sortMode==='waste' ? 'За розміром зайвого' : sortMode==='amount' ? 'За загальною сумою' : 'За назвою') + ' ▾';
+  renderCategoriesView();
+}
+
+function renderCategoriesView() {
+  const monthExp = expensesInActiveMonth();
+  const wasteTotal = monthExp.filter(e=>e.type==='waste').reduce((s,e)=>s+e.amount,0);
+  document.getElementById('cat-total-val').textContent = formatMoney(wasteTotal);
+
+  const perCat = {};
+  Object.keys(CATEGORIES).forEach(c => perCat[c] = { total:0, waste:0, count:0 });
+  monthExp.forEach(e => {
+    perCat[e.cat].total += e.amount;
+    perCat[e.cat].count += 1;
+    if (e.type==='waste') perCat[e.cat].waste += e.amount;
+  });
+
+  const wasteEntries = Object.entries(perCat).filter(([,v])=>v.waste>0).sort((a,b)=>b[1].waste-a[1].waste);
+  const maxWaste = wasteEntries.length ? wasteEntries[0][1].waste : 1;
+  const barsEl = document.getElementById('cat-bars');
+  if (!wasteEntries.length) {
+    barsEl.innerHTML = `<div style="text-align:center;color:var(--dim);font-size:12px;padding:14px 0;">Немає зайвих витрат цього місяця</div>`;
+  } else {
+    barsEl.innerHTML = wasteEntries.map(([cat,v]) => {
+      const c = CATEGORIES[cat];
+      const pctOfMax = (v.waste/maxWaste)*100;
+      const label = barUnit==='cur' ? formatMoney(v.waste) : Math.round((v.waste/wasteTotal)*100)+'%';
+      return `<div class="bar-row">
+        <div class="bar-top"><span class="bar-icon">${c.icon}</span><span class="bar-name">${c.name}</span><span class="bar-val">${label}</span></div>
+        <div class="bar-track"><div class="bar-fill" style="width:${pctOfMax}%;background:${c.color};"></div></div>
+      </div>`;
+    }).join('');
+  }
+
+  let listEntries = Object.entries(perCat).filter(([,v])=>v.total>0);
+  if (sortMode==='waste') listEntries.sort((a,b)=>b[1].waste-a[1].waste);
+  else if (sortMode==='amount') listEntries.sort((a,b)=>b[1].total-a[1].total);
+  else listEntries.sort((a,b)=>CATEGORIES[a[0]].name.localeCompare(CATEGORIES[b[0]].name));
+
+  const listEl = document.getElementById('cat-list');
+  if (!listEntries.length) {
+    listEl.innerHTML = `<div class="empty-state" style="padding:24px 10px;"><span class="es-icon">📊</span>Ще немає витрат цього місяця</div>`;
+  } else {
+    listEl.innerHTML = listEntries.map(([cat,v]) => {
+      const c = CATEGORIES[cat];
+      const wastePct = v.total>0 ? Math.round((v.waste/v.total)*100) : 0;
+      return `<div class="cat-row" onclick="showView('expenses', document.querySelectorAll('nav button')[1])">
+        <div class="cat-row-avatar" style="background:${c.color}26;color:${c.color};">${c.icon}</div>
+        <div class="cat-row-info">
+          <div class="cat-row-name">${c.name}</div>
+          <div class="cat-row-sub">${v.count} ${purchaseWord(v.count)}</div>
+        </div>
+        <div class="cat-row-right">
+          <div class="cat-row-amt">${formatMoney(v.total)}</div>
+          <div class="cat-row-pct">${wastePct}% зайвого</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+}
+function purchaseWord(n) {
+  const m10 = n%10, m100 = n%100;
+  if (m10===1 && m100!==11) return 'покупка';
+  if ([2,3,4].includes(m10) && ![12,13,14].includes(m100)) return 'покупки';
+  return 'покупок';
+}
+
+/* ---------- goal view ---------- */
+function weeklySavings() {
+  const weeks = [];
+  const now = new Date();
+  for (let i=5; i>=0; i--) {
+    const ws = startOfWeek(now);
+    ws.setDate(ws.getDate() - i*7);
+    const we = new Date(ws); we.setDate(we.getDate()+7);
+    const amt = (state.goal.log||[]).filter(l => {
+      const d = new Date(l.date);
+      return d >= ws && d < we;
+    }).reduce((s,l)=>s+l.amount, 0);
+    weeks.push({ start: ws, amt });
+  }
+  return weeks;
+}
+
+function drawBarChart(canvasId, values) {
+  const canvas = document.getElementById(canvasId);
+  canvas.width = canvas.offsetWidth || 320;
+  canvas.height = 100;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  const max = Math.max(...values, 1);
+  const n = values.length;
+  const gap = 10;
+  const barW = (canvas.width - gap*(n-1)) / n;
+  values.forEach((v,i) => {
+    const h = Math.max(3, (v/max) * (canvas.height - 6));
+    const x = i*(barW+gap);
+    const y = canvas.height - h;
+    ctx.fillStyle = i===n-1 ? '#ff8c42' : 'rgba(255,140,66,0.45)';
+    const r = Math.min(6, barW/2);
+    ctx.beginPath();
+    ctx.moveTo(x, canvas.height);
+    ctx.lineTo(x, y+r);
+    ctx.arcTo(x, y, x+r, y, r);
+    ctx.lineTo(x+barW-r, y);
+    ctx.arcTo(x+barW, y, x+barW, y+r, r);
+    ctx.lineTo(x+barW, canvas.height);
+    ctx.closePath();
+    ctx.fill();
+  });
+}
+
+function renderGoalView() {
+  const g = state.goal;
+  document.getElementById('goal-title').textContent = `Ціль: ${g.name}`;
+  document.getElementById('goal-saved-val').textContent = formatMoney(g.saved);
+  document.getElementById('goal-target-val').textContent = `з ${formatMoney(g.target)}`;
+  const pct = g.target>0 ? Math.min(1, g.saved/g.target) : 0;
+  document.getElementById('goal-pct-val').textContent = Math.round(pct*100)+'%';
+  drawDonut('goal-donut', pct, '#ff8c42', '#26272c', 20);
+
+  const weeks = weeklySavings();
+  const vals = weeks.map(w=>w.amt);
+  drawBarChart('goal-chart', vals);
+  const maxV = Math.max(...vals, 1);
+  const step = Math.ceil(maxV/3/100)*100 || 1;
+  document.getElementById('goal-chart-yaxis').innerHTML =
+    [step*3, step*2, step, 0].map(v=>`<span>${v}</span>`).join('');
+  document.getElementById('goal-chart-xaxis').innerHTML =
+    weeks.map((w,i)=>`<span>${i===weeks.length-1?'Зараз':'Тиж '+(i+1)}</span>`).join('');
+
+  document.getElementById('goal-progress-title').textContent = `${Math.round(pct*100)}% досягнуто`;
+
+  const avgWeekly = vals.reduce((s,v)=>s+v,0) / vals.length;
+  const remaining = Math.max(0, g.target - g.saved);
+  const etaTitle = document.getElementById('goal-eta-title');
+  const etaSub = document.getElementById('goal-eta-sub');
+  if (remaining <= 0) {
+    etaTitle.textContent = 'Ціль досягнута! 🎉';
+    etaSub.textContent = 'Час поставити нову ціль';
+  } else if (avgWeekly > 0) {
+    const weeksLeft = Math.ceil(remaining / avgWeekly);
+    const etaDate = new Date();
+    etaDate.setDate(etaDate.getDate() + weeksLeft*7);
+    etaTitle.textContent = `Ще ${weeksLeft} ${weekWord(weeksLeft)} за поточним темпом`;
+    etaSub.textContent = `Ціль буде досягнута орієнтовно ${etaDate.toLocaleDateString('uk-UA',{day:'numeric',month:'short'})}.`;
+  } else {
+    etaTitle.textContent = 'Почни заощаджувати';
+    etaSub.textContent = 'Додай перше заощадження, щоб побачити прогноз';
+  }
+}
+function weekWord(n) {
+  const m10=n%10, m100=n%100;
+  if (m10===1 && m100!==11) return 'тиждень';
+  if ([2,3,4].includes(m10) && ![12,13,14].includes(m100)) return 'тижні';
+  return 'тижнів';
+}
+
+/* ---------- add expense sheet ---------- */
+function openAddSheet() {
+  document.getElementById('inp-amount').value = '';
+  document.getElementById('inp-note').value = '';
+  pendingCategory = 'coffee';
+  pendingType = 'waste';
+  renderCatGrid();
+  setExpType('waste');
+  document.getElementById('add-backdrop').classList.add('open');
+  document.getElementById('add-sheet').classList.add('open');
+}
+function closeAddSheet() {
+  document.getElementById('add-backdrop').classList.remove('open');
+  document.getElementById('add-sheet').classList.remove('open');
+}
+function renderCatGrid() {
+  const grid = document.getElementById('cat-grid');
+  grid.innerHTML = Object.entries(CATEGORIES).map(([key,c]) => `
+    <div class="cat-pick ${key===pendingCategory?'active':''}" onclick="pickCategory('${key}')">
+      <div class="cp-icon" style="background:${c.color}26;color:${c.color};">${c.icon}</div>
+      <div class="cp-name">${c.name}</div>
+    </div>
+  `).join('');
+}
+function pickCategory(key) {
+  pendingCategory = key;
+  renderCatGrid();
+}
+function setExpType(t) {
+  pendingType = t;
+  document.getElementById('type-necessary').classList.toggle('active-necessary', t==='necessary');
+  document.getElementById('type-waste').classList.toggle('active-waste', t==='waste');
+}
+function saveExpense() {
+  const amount = parseFloat(document.getElementById('inp-amount').value);
+  if (!amount || amount <= 0) { alert('Впиши суму витрати!'); return; }
+  const note = document.getElementById('inp-note').value.trim();
+  state.expenses.push({
+    id: 'e'+Date.now()+Math.random().toString(36).slice(2,7),
+    amount, cat: pendingCategory, type: pendingType, note, ts: Date.now(),
+  });
+  save();
+  closeAddSheet();
+  refreshAll();
+}
+
+/* ---------- goal edit sheet ---------- */
+function openEditGoalSheet() {
+  document.getElementById('inp-goal-name').value = state.goal.name;
+  document.getElementById('inp-goal-target').value = state.goal.target;
+  document.getElementById('goal-backdrop').classList.add('open');
+  document.getElementById('goal-sheet').classList.add('open');
+}
+function closeGoalSheet() {
+  document.getElementById('goal-backdrop').classList.remove('open');
+  document.getElementById('goal-sheet').classList.remove('open');
+}
+function saveGoalEdit() {
+  const name = document.getElementById('inp-goal-name').value.trim();
+  const target = parseFloat(document.getElementById('inp-goal-target').value);
+  if (!name || !target || target <= 0) { alert('Заповни назву і суму цілі!'); return; }
+  state.goal.name = name;
+  state.goal.target = target;
+  save();
+  closeGoalSheet();
+  refreshAll();
+}
+
+/* ---------- add savings sheet ---------- */
+function openAddSavingsSheet() {
+  document.getElementById('inp-savings-amount').value = '';
+  document.getElementById('savings-backdrop').classList.add('open');
+  document.getElementById('savings-sheet').classList.add('open');
+}
+function closeSavingsSheet() {
+  document.getElementById('savings-backdrop').classList.remove('open');
+  document.getElementById('savings-sheet').classList.remove('open');
+}
+function saveSavingsDeposit() {
+  const amount = parseFloat(document.getElementById('inp-savings-amount').value);
+  if (!amount || amount <= 0) { alert('Впиши суму заощадження!'); return; }
+  if (!state.goal.log) state.goal.log = [];
+  state.goal.log.push({ date: Date.now(), amount });
+  state.goal.saved += amount;
+  save();
+  closeSavingsSheet();
+  refreshAll();
+}
+
+/* ---------- nav ---------- */
+function showView(v, btn) {
+  document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(el=>el.classList.remove('active'));
+  document.getElementById('view-'+v).classList.add('active');
+  if (btn) btn.classList.add('active');
+  if (v==='expenses') renderExpensesView();
+  if (v==='categories') renderCategoriesView();
+  if (v==='goal') renderGoalView();
+}
+
+function refreshAll() {
+  renderOverview();
+  const activeView = document.querySelector('.view.active').id.replace('view-','');
+  if (activeView==='expenses') renderExpensesView();
+  if (activeView==='categories') renderCategoriesView();
+  if (activeView==='goal') renderGoalView();
+}
+
+window.addEventListener('resize', () => {
+  const activeView = document.querySelector('.view.active').id.replace('view-','');
+  if (activeView==='goal') renderGoalView();
+});
+
+refreshAll();
+</script>
+</body>
+</html>
